@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>De Lijn Tracker</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="color-scheme" content="light dark">
+
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<style>
+html{color-scheme:light dark;}
+
+:root{
+  --bg:#ECECEC;
+  --card:white;
+  --text:#222;
+  --accent:#FFD200;
+  --accent-dark:#3A3A3A;
+  --error:#ff3b3b;
+}
+
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+body.dark{
+  --bg:#121212;
+  --card:#1e1e1e;
+  --text:#eee;
+}
+
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  transition:.25s;
+  
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* HEADER */
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--card);
+  padding:12px 18px;
+  box-shadow:0 3px 10px rgba(0,0,0,.08);
+}
+
+.titleWrap{display:flex;align-items:center;gap:10px;}
+.logo {
+  width: 34px;
+  height: 34px;
+  background-image: url('logo.png'); /* Add this line */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 8px;
+}
+h1{font-size:20px;margin:0;}
+
+.menuBtn{
+  font-size:22px;
+  cursor:pointer;
+  padding:6px 10px;
+  border-radius:8px;
+  transition:.2s;
+}
+.menuBtn:hover{
+  background: rgba(0,0,0,0.08);
+}
+
+body.dark .menuBtn:hover{
+  background: rgba(255,255,255,0.08);
+}
+
+
+#sideMenu{
+  position:fixed;
+  right:12px;
+  top:12px;
+  width:290px;
+  height:calc(100% - 24px);
+  padding:18px;
+  transform:translateX(110%);
+  transition:transform .35s cubic-bezier(.22,.9,.24,1);
+  z-index:2000;
+
+  border-radius:18px;
+
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+
+  box-shadow:
+    -8px 0 30px rgba(0,0,0,0.15),
+    0 0 0 1px rgba(255,255,255,0.15) inset;
+
+  overflow:hidden;
+}
+
+#sideMenu h3{
+  margin-top:6px;
+  margin-bottom:14px;
+}
+
+.switchRow{
+  margin:16px 0;
+}
+
+/* LIGHT GLASS */
+body:not(.dark) #sideMenu{
+  background:
+    linear-gradient(rgba(255,255,255,0.75), rgba(255,255,255,0.65)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+}
+
+/* DARK GLASS */
+body.dark #sideMenu{
+  background:
+    linear-gradient(rgba(25,25,25,0.75), rgba(15,15,15,0.7)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+}
+
+/* OPEN STATE */
+#sideMenu.open{
+  transform:translateX(0);
+}
+
+
+body.dark #sideMenu{
+  background: rgba(30,30,30,0.75);
+}
+
+#sideMenu.open{
+transform:translateX(0);
+ box-shadow:
+    -12px 0 45px rgba(0,0,0,0.25),
+    0 0 0 1px rgba(255,255,255,0.18) inset;
+}
+
+.closeBtn{
+  float:right;
+  cursor:pointer;
+  font-size:18px;
+}
+
+.smallText{
+  font-size:12px;
+  opacity:0.65;
+  margin-top:4px;
+}
+
+/* CONTROLS */
+#controls{
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  margin:20px 0;
+}
+
+.searchWrap{
+  display:flex;
+  align-items:center;
+  position:relative;
+  max-width:240px;
+}
+
+.searchWrap input{
+  width:100%;
+  padding:12px 75px 12px 16px;
+  border-radius:25px;
+  border:1px solid #ccc;
+  background:var(--card);
+  color:var(--text);
+  transition:.2s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+.searchWrap input.error{
+  border:2px solid var(--error);
+}
+
+.trackBtn{
+  position:absolute;
+  right:6px;
+  border-radius:20px;
+  border:none;
+  padding:0 14px;
+  font-weight:bold;
+  background:var(--accent);
+  cursor:pointer;
+  height:30px;
+  font-size:13px;
+}
+
+.recenterBtn{
+  background:var(--accent);
+  border:none;
+  border-radius:25px;
+  padding:0 18px;
+  height:40px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+/* MAP */
+#mapWrap{width:75%;margin:auto;position:relative;}
+#map{height:60vh;border-radius:14px;}
+
+#realtimeBadge{
+  position:absolute;
+  top:14px;
+  right:14px;
+  background:#2ecc71;
+  color:white;
+  padding:6px 12px;
+  border-radius:10px;
+  font-size:12px;
+  display:none;
+  z-index:1000;
+  font-weight:bold;
+  animation:pulse 1.2s infinite;
+}
+
+
+#liveInfo{
+  background:var(--card);
+  margin-top:10px;
+  padding:12px;
+  border-radius:12px;
+  font-size:14px;
+}
+
+/* ROUTE PANEL */
+#routePanel{
+  width:75%;
+  margin:22px auto;
+  background:var(--card);
+  border-radius:14px;
+  overflow:hidden;
+}
+
+#routeHeader{
+  padding:14px;
+  background:var(--accent-dark);
+  color:white;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+#routeBody{
+  padding:16px;
+  display:none;
+}
+
+/* SWITCHES */
+.switchRow{
+  display:flex;
+  flex-direction:column;
+  margin:18px 0;
+}
+
+.switch{
+  position:relative;
+  width:48px;
+  height:24px;
+}
+
+.switch input{display:none;}
+
+.slider{
+  position:absolute;
+  inset:0;
+  background:#ccc;
+  border-radius:20px;
+}
+
+.slider:before{
+  content:"";
+  position:absolute;
+  width:18px;height:18px;
+  left:3px;top:3px;
+  background:white;
+  border-radius:50%;
+  transition:.2s;
+}
+
+input:checked + .slider{background:var(--accent);}
+input:checked + .slider:before{transform:translateX(24px);}
+
+/* THEME PILL */
+.themeSection{margin-top:12px;}
+
+.themePill{
+  display:flex;
+  border-radius:999px;
+  overflow:hidden;
+  border:1px solid #ccc;
+  margin-top:10px;
+  width:100%;
+}
+
+.themePill button{
+  flex:1;
+  padding:10px 0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:14px;
+  color: var(--text);
+}
+
+.themePill button.active{
+  background:var(--accent);
+  font-weight:bold;
+  color:#000;
+}
+
+@media(max-width:900px){
+  #mapWrap,#routePanel{width:95%;}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="titleWrap">
+    <div class="logo"></div>
+    <h1>De Lijn Tracker</h1>
+  </div>
+  <div class="menuBtn" onclick="toggleMenu()">☰</div>
+</header>
+
+<div id="sideMenu">
+  <div class="closeBtn" onclick="toggleMenu()">✕</div>
+  <h3>Options</h3>
+
+  <div class="themeSection">
+    <strong>Theme</strong>
+    <div class="smallText">More features may come in future updates.</div>
+
+    <div class="themePill">
+      <button onclick="setTheme('light')" id="lightBtn">Light</button>
+      <button onclick="setTheme('dark')" id="darkBtn">Dark</button>
+      <button onclick="setTheme('system')" id="systemBtn">System</button>
+    </div>
+  </div>
+
+  <div class="switchRow">
+    <strong>Show trail</strong>
+    <label class="switch">
+      <input type="checkbox" id="trailToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="switchRow">
+    <strong>Movement history</strong>
+    <label class="switch">
+      <input type="checkbox" id="historyToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="smallText" style="margin-top:25px;">
+    Future versions may bring more features here.
+  </div>
+</div>
+
+<div id="controls">
+  <div class="searchWrap">
+    <input type="text" id="vehicleInput" placeholder="Vehicle number...">
+    <button class="trackBtn" onclick="trackVehicle()">Track</button>
+  </div>
+  <button class="recenterBtn" onclick="recenter()">Recenter</button>
+</div>
+
+<div id="mapWrap">
+  <div id="realtimeBadge">REALTIME</div>
+  <div id="map"></div>
+  <div id="liveInfo">Speed: -- | Coordinates: --</div>
+</div>
+
+<div id="routePanel">
+  <div id="routeHeader" onclick="toggleRoute()">Route information</div>
+  <div id="routeBody">Waiting for data...</div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+let map=L.map('map').setView([50.826,3.264],13);
+
+let marker=null,interval=null;
+let polyline=L.polyline([], {weight:4}).addTo(map);
+let lastPos=null,firstCenter=false;
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+const busIcon=L.icon({
+  iconUrl:'bus.png',
+  iconSize:[42,42],
+  iconAnchor:[21,21]
+});
+
+function toggleMenu(){
+  document.getElementById("sideMenu").classList.toggle("open");
+}
+function toggleRoute(){
+  const b=document.getElementById("routeBody");
+  b.style.display=b.style.display==="block"?"none":"block";
+}
+
+vehicleInput.addEventListener("keypress",e=>{
+  if(e.key==="Enter") trackVehicle();
+});
+
+function setTheme(mode){
+  localStorage.setItem("theme",mode);
+  applyTheme(mode);
+  updateThemeUI(mode);
+}
+function applyTheme(mode){
+  let dark=false;
+  if(mode==="dark") dark=true;
+  else if(mode==="system")
+    dark=window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  document.body.classList.toggle("dark",dark);
+}
+function updateThemeUI(mode){
+  document.querySelectorAll(".themePill button").forEach(b=>b.classList.remove("active"));
+  document.getElementById(mode+"Btn").classList.add("active");
+}
+const savedTheme=localStorage.getItem("theme")||"system";
+applyTheme(savedTheme);
+updateThemeUI(savedTheme);
+
+function trackVehicle(){
+  const input=document.getElementById("vehicleInput");
+  const v=input.value.trim();
+
+  input.classList.remove("error");
+
+  if(!v){ input.classList.add("error"); return; }
+
+  if(interval) clearInterval(interval);
+  if(marker){ map.removeLayer(marker); marker=null; }
+
+  polyline.setLatLngs([]);
+  lastPos=null;
+  firstCenter=false;
+
+  fetchData(v,true);
+  interval=setInterval(()=>fetchData(v,false),5000);
+}
+
+function fetchData(v,firstTry){
+fetch(`https://trck.rmq475.workers.dev/${v}?t=${Date.now()}`)
+.then(r=>r.json()).then(data=>{
+ if(!data.data?.length){
+   if(firstTry) vehicleInput.classList.add("error");
+   return;
+ }
+
+ const p=data.data[0];
+ const pos=[p.lat,p.lon];
+
+ if(marker) marker.setLatLng(pos);
+ else marker=L.marker(pos,{icon:busIcon}).addTo(map);
+
+ if(!firstCenter){
+   map.setView(pos,16);
+   firstCenter=true;
+ }
+
+ if(historyToggle.checked)
+   polyline.setLatLngs(data.data.map(x=>[x.lat,x.lon]));
+ else if(trailToggle.checked)
+   polyline.addLatLng(pos);
+
+ liveInfo.innerHTML=
+ `Speed: ${(p.speed*3.6).toFixed(1)} km/h |
+  Coordinates: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+
+ const realtime=Math.abs(Date.now()-p.updateEpochMillis)<15000;
+ realtimeBadge.style.display=realtime?"block":"none";
+
+ let inRoute=p.onTrack?"Yes":"No";
+ let status="On time";
+
+ if(p.delay>30) status=`+${Math.round(p.delay/60)} min delayed`;
+ else if(p.delay<-30) status=`-${Math.round(Math.abs(p.delay)/60)} min early`;
+
+ routeBody.innerHTML=
+ `<b>In route:</b> ${inRoute}<br>
+  <b>Status:</b> ${status}<br>
+  <b>Line:</b> ${p.lineId}<br>
+  <b>Last event:</b> ${p.event}`;
+
+ lastPos=pos;
+});
+}
+
+function recenter(){
+ if(marker) map.setView(marker.getLatLng(),16);
+}
+</script>
+
+</body>
+</html>
