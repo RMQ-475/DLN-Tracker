@@ -8,7 +8,7 @@
 
   <link rel="icon" href="favicon.ico">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
+  
 <style>
 html{color-scheme:light dark;}
 
@@ -20,13 +20,6 @@ html{color-scheme:light dark;}
   --accent-dark:#3A3A3A;
   --error:#ff3b3b;
 }
-
-html, body {
-  height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
 
 @keyframes pulse {
   0% { transform: scale(1); }
@@ -46,26 +39,43 @@ body{
   background:var(--bg);
   color:var(--text);
   transition:.25s;
-  
-  padding-top: env(safe-area-inset-top);
+
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* HEADER */
 header{
+  position: sticky;
+  top: 0;
+  z-index: 1500;
+
   display:flex;
   align-items:center;
   justify-content:space-between;
-  background:var(--card);
-  padding:12px 18px;
-  box-shadow:0 3px 10px rgba(0,0,0,.08);
+
+  padding:14px 18px;
+
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+
+  transition: background .3s ease, box-shadow .3s ease;
 }
+
+body:not(.dark) header{
+  background: rgba(255,255,255,0.75);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+body.dark header{
+  background: rgba(20,20,20,0.75);
+  box-shadow: 0 4px 25px rgba(0,0,0,0.3);
+}
+
 
 .titleWrap{display:flex;align-items:center;gap:10px;}
 .logo {
   width: 34px;
   height: 34px;
-  background-image: url('logo.png'); /* Add this line */
+  background-image: url('logo.png'); 
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
@@ -121,21 +131,18 @@ body.dark .menuBtn:hover{
   margin:16px 0;
 }
 
-/* LIGHT GLASS */
 body:not(.dark) #sideMenu{
   background:
     linear-gradient(rgba(255,255,255,0.75), rgba(255,255,255,0.65)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
 }
 
-/* DARK GLASS */
 body.dark #sideMenu{
   background:
     linear-gradient(rgba(25,25,25,0.75), rgba(15,15,15,0.7)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
 }
 
-/* OPEN STATE */
 #sideMenu.open{
   transform:translateX(0);
 }
@@ -164,7 +171,6 @@ transform:translateX(0);
   margin-top:4px;
 }
 
-/* CONTROLS */
 #controls{
   display:flex;
   justify-content:center;
@@ -217,7 +223,6 @@ transform:translateX(0);
   cursor:pointer;
 }
 
-/* MAP */
 #mapWrap{width:75%;margin:auto;position:relative;}
 #map{height:60vh;border-radius:14px;}
 
@@ -245,7 +250,6 @@ transform:translateX(0);
   font-size:14px;
 }
 
-/* ROUTE PANEL */
 #routePanel{
   width:75%;
   margin:22px auto;
@@ -267,7 +271,6 @@ transform:translateX(0);
   display:none;
 }
 
-/* SWITCHES */
 .switchRow{
   display:flex;
   flex-direction:column;
@@ -302,7 +305,6 @@ transform:translateX(0);
 input:checked + .slider{background:var(--accent);}
 input:checked + .slider:before{transform:translateX(24px);}
 
-/* THEME PILL */
 .themeSection{margin-top:12px;}
 
 .themePill{
@@ -377,6 +379,14 @@ input:checked + .slider:before{transform:translateX(24px);}
     </label>
   </div>
 
+  <div class="switchRow">
+  <strong>Dark Map</strong>
+  <label class="switch">
+    <input type="checkbox" id="darkMapToggle" onchange="updateMapTheme()">
+    <span class="slider"></span>
+  </label>
+</div>
+
   <div class="smallText" style="margin-top:25px;">
     Future versions may bring more features here.
   </div>
@@ -404,18 +414,30 @@ input:checked + .slider:before{transform:translateX(24px);}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-let map=L.map('map').setView([50.826,3.264],13);
+let map = L.map('map').setView([50.826,3.264],13);
 
 let marker=null,interval=null;
 let polyline=L.polyline([], {weight:4}).addTo(map);
-let lastPos=null,firstCenter=false;
+let lastPos=null;
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let followVehicle = false;
+let isProgrammaticMove = false;
+
+let currentLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+const lightTiles = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 
 const busIcon=L.icon({
   iconUrl:'bus.png',
   iconSize:[42,42],
   iconAnchor:[21,21]
+});
+
+map.on('movestart', () => {
+  if (!isProgrammaticMove) {
+    followVehicle = false;
+  }
 });
 
 function toggleMenu(){
@@ -464,10 +486,13 @@ function trackVehicle(){
 
   polyline.setLatLngs([]);
   lastPos=null;
-  firstCenter=false;
+
+  followVehicle = true; 
 
   fetchData(v,true);
   interval=setInterval(()=>fetchData(v,false),5000);
+
+  interval=setInterval(()=>fetchData(v,false), isApp ? 3000 : 5000);
 }
 
 function fetchData(v,firstTry){
@@ -484,9 +509,10 @@ fetch(`https://trck.rmq475.workers.dev/${v}?t=${Date.now()}`)
  if(marker) marker.setLatLng(pos);
  else marker=L.marker(pos,{icon:busIcon}).addTo(map);
 
- if(!firstCenter){
+ if (followVehicle) {
+   isProgrammaticMove = true;
    map.setView(pos,16);
-   firstCenter=true;
+   setTimeout(()=>isProgrammaticMove=false, 200);
  }
 
  if(historyToggle.checked)
@@ -499,7 +525,7 @@ fetch(`https://trck.rmq475.workers.dev/${v}?t=${Date.now()}`)
   Coordinates: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
 
  const realtime=Math.abs(Date.now()-p.updateEpochMillis)<15000;
- realtimeBadge.style.display=realtime?"block":"none";
+ realtimeBadge.style.display= realtime? "block":"none";
 
  let inRoute=p.onTrack?"Yes":"No";
  let status="On time";
@@ -518,9 +544,41 @@ fetch(`https://trck.rmq475.workers.dev/${v}?t=${Date.now()}`)
 }
 
 function recenter(){
- if(marker) map.setView(marker.getLatLng(),16);
+ if(marker){
+   followVehicle = true;
+   isProgrammaticMove = true;
+   map.setView(marker.getLatLng(),16);
+   setTimeout(()=>isProgrammaticMove=false, 200);
+ }
 }
+
+function updateMapTheme() {
+  const isDark = document.getElementById('darkMapToggle').checked;
+  
+  map.removeLayer(currentLayer);
+  
+  currentLayer = L.tileLayer(isDark ? darkTiles : lightTiles, {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  localStorage.setItem("darkMap", isDark);
+
+if (isDark) {
+    polyline.setStyle({ color: '#FFD200' }); 
+} else {
+    polyline.setStyle({ color: '#3388ff' });
+}
+}
+
+window.addEventListener('load', () => {
+  if (localStorage.getItem("darkMap") === "true") {
+    document.getElementById('darkMapToggle').checked = true;
+    updateMapTheme();
+  }
+});
+
 </script>
+
 
 </body>
 </html>
