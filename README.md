@@ -1,2 +1,2 @@
 # DLN-Tracker
-Vehicle tracker for De Lijn Vehicles. This repo hosts only the mobile version (though the HTML is almost the same)
+Vehicle tracker for De Lijn Vehicles. This repo now hosts both the mobile app and the site (the HTML is the same).
